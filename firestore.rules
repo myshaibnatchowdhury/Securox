@@ -1,0 +1,540 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users/{userId}
+// Document ID: Matches Firebase Auth UID (request.auth.uid)
+// Fields:
+//   - userId: string (required, 1-128 chars, matches auth.uid) - User ID [immutable]
+//   - email: string (required, 3-100 chars, valid email format) - Primary contact email
+//   - displayName: string (optional, 1-100 chars) - User full or screen name
+//   - phoneNumber: string (optional, 5-30 chars) - User mobile phone number
+//   - photoUrl: string (optional, 10-500 chars, http/https URL) - Avatar image URL
+//   - role: string (optional, 'user' or 'admin', client restricted) - RBAC role [immutable for regular users]
+//   - fcmToken: string (optional, 1-500 chars) - Device messaging registration token
+//   - createdAt: timestamp / integer (required, > 0) - Account creation time [immutable]
+//   - updatedAt: timestamp / integer (optional, > 0) - Last profile update time
+//
+// Collection: devices/{deviceId}
+// Document ID: Unique device hardware or installation identifier (1-128 chars)
+// Fields:
+//   - deviceId: string (optional, 1-128 chars, matches docId) - Device identifier
+//   - ownerUid: string (required, 1-128 chars, matches auth.uid) - Owner UID [immutable]
+//   - deviceName: string (required, 1-100 chars) - User-friendly device name (e.g., "Pixel 8 Pro")
+//   - manufacturer: string (required, 1-100 chars) - Device OEM (e.g., "Google", "Samsung")
+//   - model: string (required, 1-100 chars) - Hardware model identifier
+//   - androidVersion: string / integer (required, string 1-50 chars or int 1-100) - Android OS version
+//   - registeredAt: timestamp / integer (required, > 0) - Device initial registration timestamp [immutable]
+//   - lastSeen: timestamp / integer (required, > 0) - Heartbeat timestamp
+//   - onlineStatus: string (required, 'ONLINE' or 'OFFLINE') - Current connectivity state
+//   - batteryLevel: integer / number (required, 0-100) - Battery percentage
+//   - lastLocation: map (optional, contains latitude, longitude, accuracy, timestamp) - Most recent GPS fix
+//   - adminEnabled: boolean (required) - Whether Android Device Admin privilege is active
+//   - deviceOwnerMode: boolean (required) - Whether Android Device Owner privilege is active
+//   - protectionStatus: string / boolean (required, 'NORMAL', 'ACTIVE', 'ARMED', 'LOCKED', 'LOST', 'STOLEN', 'DISABLED' or bool)
+//   - fcmToken: string (optional, 1-500 chars) - Push notification token for remote dispatch
+//
+// Collection: device_commands/{commandId}
+// Document ID: Unique command identifier (1-128 chars, matches request.resource.data.commandId)
+// Fields:
+//   - commandId: string (required, 1-128 chars, matches docId) - Command ID [immutable]
+//   - ownerUid: string (required, 1-128 chars, matches auth.uid) - Issuer UID [immutable]
+//   - targetDeviceId: string (required, 1-128 chars) - Target device document ID [immutable]
+//   - commandType: string (required, e.g. LOCK, UNLOCK, LOCATE, ALARM, SIREN, WIPE, etc.) [immutable]
+//   - createdAt: timestamp / integer (required, > 0) - Dispatch creation time [immutable]
+//   - expiresAt: timestamp / integer (required, in the future relative to request.time) - Command TTL [immutable]
+//   - status: string (required, 'PENDING', 'DELIVERED', 'EXECUTED', 'FAILED', 'EXPIRED', 'PENDING_DELIVERY', 'DELIVERY_FAILED')
+//   - executionResult: string (optional, 0-2000 chars) - Status report or error output from device
+//   - executedAt: timestamp / integer (optional, > 0) - Execution completion timestamp
+//   - deliveredAt: timestamp / integer (optional, > 0) - Push delivery acknowledgment timestamp
+//   - updatedAt: timestamp / integer (optional, > 0) - Last state modification timestamp
+//   - payload: map (optional, max 10 keys) - Optional command arguments (e.g. lock message, pin)
+//   - parameters: map (optional, max 10 keys) - Supplementary execution parameters
+//
+// Collection: device_locations/{locationId}
+// Document ID: Unique location record identifier (1-128 chars)
+// Fields:
+//   - locationId: string (optional, 1-128 chars) - Location fix ID
+//   - deviceId: string (required, 1-128 chars) - Device reporting coordinates [immutable]
+//   - ownerUid: string (required, 1-128 chars, matches auth.uid) - Owner UID [immutable]
+//   - latitude: number (required, -90.0 to 90.0) - GPS latitude coordinate
+//   - longitude: number (required, -180.0 to 180.0) - GPS longitude coordinate
+//   - accuracy: number (required, 0.0 to 10000.0) - Fix accuracy radius in meters
+//   - timestamp: timestamp / integer (required, > 0) - Fix acquisition timestamp
+//   - altitude: number (optional) - Altitude in meters above sea level
+//   - speed: number (optional, >= 0.0) - Speed over ground in m/s
+//   - bearing: number (optional, 0.0 to 360.0) - Travel bearing in degrees
+//   - provider: string (optional, 1-50 chars) - Location provider (e.g., 'gps', 'network', 'fused')
+//
+// Collection: security_events/{eventId}
+// Document ID: Unique audit event identifier (1-128 chars)
+// Fields:
+//   - eventId: string (optional, 1-128 chars) - Audit event ID
+//   - deviceId: string (required, 1-128 chars) - Associated device ID [immutable]
+//   - ownerUid: string (required, 1-128 chars, matches auth.uid) - Owner UID [immutable]
+//   - eventType: string (required, 1-100 chars) - Event descriptor (e.g. SIM_CHANGED, WRONG_PIN, COMMAND_EXECUTED) [immutable]
+//   - timestamp: timestamp / integer (required, > 0) - Event occurrence timestamp [immutable]
+//   - details: string (required, 0-2000 chars) - Diagnostic or contextual event description
+//   - severity: string (required, 'INFO', 'LOW', 'MEDIUM', 'WARNING', 'HIGH', 'CRITICAL') - Alert priority
+//   - metadata: map (optional, max 20 keys) - Supplementary structured event telemetry
+//
+// Collection: notifications/{notificationId}
+// Document ID: Unique user notification identifier (1-128 chars)
+// Fields:
+//   - notificationId: string (optional, 1-128 chars) - Notification ID
+//   - userId: string (required, 1-128 chars, matches auth.uid) - Target recipient user ID [immutable]
+//   - title: string (required, 1-200 chars) - Alert headline
+//   - message: string (required, 1-2000 chars) - Notification body message
+//   - timestamp: timestamp / integer (required, > 0) - Dispatch timestamp [immutable]
+//   - read: boolean (required) - Read status indicator
+//   - type: string (optional, 1-50 chars) - Alert category (e.g. 'COMMAND_STATUS', 'SECURITY_ALERT')
+//   - data: map (optional, max 20 keys) - Deep-link payload or additional attributes
+//
+// Collection: trusted_devices/{trustedId}
+// Document ID: Unique trusted contact / secondary device identifier (1-128 chars)
+// Fields:
+//   - trustedId: string (optional, 1-128 chars) - Trusted relationship ID
+//   - ownerUid: string (required, 1-128 chars, matches auth.uid) - Owner UID [immutable]
+//   - deviceId: string (optional, 1-128 chars) - Associated target device ID
+//   - name: string (required, 1-100 chars) - Trusted contact or device nickname
+//   - phoneNumber: string (optional, 5-30 chars) - Emergency SMS notification number
+//   - relationship: string (optional, 1-50 chars) - Relationship descriptor (e.g. 'Spouse', 'Backup Phone')
+//   - addedAt: timestamp / integer (required, > 0) - Association timestamp [immutable]
+//   - isActive: boolean (optional) - Active trust state indicator
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Global Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request is authenticated with a valid UID
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Check if authenticated user matches the expected userId
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the user has bootstrapped admin custom claim
+    function isAdmin() {
+      return isAuthenticated() &&
+             request.auth.token != null &&
+             request.auth.token.admin == true;
+    }
+
+    // Validate that document contains all required field keys
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that document contains only allowed field keys (prevents schema pollution)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Ensure designated immutable fields are not modified or deleted on update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate timestamp (accepts Firestore Timestamp or positive epoch integer)
+    function isValidTimestamp(val) {
+      return val is timestamp || (val is int && val > 0);
+    }
+
+    // Validate that timestamp is in the future relative to server evaluation time
+    function isFutureTimestamp(val) {
+      return (val is timestamp && val > request.time) ||
+             (val is int && val > request.time.toMillis());
+    }
+
+    // Validate standard email format and length bounds
+    function isValidEmail(email) {
+      return email is string &&
+             email.size() >= 3 && email.size() <= 100 &&
+             email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // Validate standard HTTP / HTTPS URL format and length bounds
+    function isValidUrl(url) {
+      return url is string &&
+             url.size() >= 10 && url.size() <= 500 &&
+             (url.matches('^https://.*') || url.matches('^http://.*'));
+    }
+
+    // Verify whether authenticated user is the verified owner of a target device
+    function isDeviceOwner(deviceId) {
+      return isAuthenticated() &&
+             deviceId is string &&
+             deviceId.size() > 0 &&
+             exists(/databases/$(database)/documents/devices/$(deviceId)) &&
+             get(/databases/$(database)/documents/devices/$(deviceId)).data.ownerUid == request.auth.uid;
+    }
+
+    // Validate state transitions for remote device commands
+    function validCommandStatusTransition(oldStatus, newStatus) {
+      return oldStatus == newStatus ||
+             (oldStatus == 'PENDING' && (newStatus in ['DELIVERED', 'PENDING_DELIVERY', 'DELIVERY_FAILED', 'FAILED', 'EXPIRED'])) ||
+             (oldStatus == 'PENDING_DELIVERY' && (newStatus in ['DELIVERED', 'DELIVERY_FAILED', 'FAILED', 'EXPIRED'])) ||
+             (oldStatus == 'DELIVERED' && (newStatus in ['EXECUTED', 'FAILED', 'EXPIRED']));
+    }
+
+    // Validate structured GPS fix map inside devices collection
+    function isValidLastLocation(loc) {
+      return loc is map &&
+             loc.keys().hasOnly(['latitude', 'longitude', 'accuracy', 'timestamp', 'address', 'provider', 'speed', 'altitude', 'bearing']) &&
+             loc.latitude is number && loc.latitude >= -90.0 && loc.latitude <= 90.0 &&
+             loc.longitude is number && loc.longitude >= -180.0 && loc.longitude <= 180.0 &&
+             loc.accuracy is number && loc.accuracy >= 0.0 && loc.accuracy <= 10000.0 &&
+             isValidTimestamp(loc.timestamp) &&
+             (!('address' in loc) || (loc.address is string && loc.address.size() <= 200)) &&
+             (!('provider' in loc) || (loc.provider is string && loc.provider.size() <= 50)) &&
+             (!('speed' in loc) || (loc.speed is number && loc.speed >= 0.0)) &&
+             (!('altitude' in loc) || loc.altitude is number) &&
+             (!('bearing' in loc) || (loc.bearing is number && loc.bearing >= 0.0 && loc.bearing <= 360.0));
+    }
+
+    // ===============================================================
+    // Domain Validator Functions
+    // ===============================================================
+
+    // Domain validator for users/{userId}
+    function isValidUser(data) {
+      return hasOnlyAllowedFields([
+          'userId', 'email', 'displayName', 'phoneNumber',
+          'photoUrl', 'role', 'fcmToken', 'createdAt', 'updatedAt'
+        ]) &&
+        hasRequiredFields(['userId', 'email', 'createdAt']) &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        isValidEmail(data.email) &&
+        isValidTimestamp(data.createdAt) &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100)) &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() >= 5 && data.phoneNumber.size() <= 30)) &&
+        (!('photoUrl' in data) || isValidUrl(data.photoUrl)) &&
+        (!('role' in data) || (data.role is string && data.role in ['user', 'admin'])) &&
+        (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() > 0 && data.fcmToken.size() <= 500)) &&
+        (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    // Domain validator for devices/{deviceId}
+    function isValidDevice(data) {
+      return hasOnlyAllowedFields([
+          'deviceId', 'ownerUid', 'deviceName', 'manufacturer', 'model',
+          'androidVersion', 'registeredAt', 'lastSeen', 'onlineStatus',
+          'batteryLevel', 'lastLocation', 'adminEnabled', 'deviceOwnerMode',
+          'protectionStatus', 'fcmToken'
+        ]) &&
+        hasRequiredFields([
+          'ownerUid', 'deviceName', 'manufacturer', 'model', 'androidVersion',
+          'registeredAt', 'lastSeen', 'onlineStatus', 'batteryLevel',
+          'adminEnabled', 'deviceOwnerMode', 'protectionStatus'
+        ]) &&
+        (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() > 0 && data.deviceId.size() <= 128)) &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128 &&
+        data.deviceName is string && data.deviceName.size() > 0 && data.deviceName.size() <= 100 &&
+        data.manufacturer is string && data.manufacturer.size() > 0 && data.manufacturer.size() <= 100 &&
+        data.model is string && data.model.size() > 0 && data.model.size() <= 100 &&
+        ((data.androidVersion is string && data.androidVersion.size() > 0 && data.androidVersion.size() <= 50) ||
+         (data.androidVersion is int && data.androidVersion >= 1 && data.androidVersion <= 100)) &&
+        isValidTimestamp(data.registeredAt) &&
+        isValidTimestamp(data.lastSeen) &&
+        data.onlineStatus is string && data.onlineStatus in ['ONLINE', 'OFFLINE'] &&
+        (data.batteryLevel is int || data.batteryLevel is number) &&
+        data.batteryLevel >= 0 && data.batteryLevel <= 100 &&
+        data.adminEnabled is bool &&
+        data.deviceOwnerMode is bool &&
+        ((data.protectionStatus is string && data.protectionStatus in [
+          'NORMAL', 'ACTIVE', 'ARMED', 'LOCKED', 'LOST', 'STOLEN', 'DISABLED'
+        ]) || data.protectionStatus is bool) &&
+        (!('lastLocation' in data) || data.lastLocation == null || isValidLastLocation(data.lastLocation)) &&
+        (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() > 0 && data.fcmToken.size() <= 500));
+    }
+
+    // Domain validator for device_commands/{commandId}
+    function isValidCommand(data) {
+      return hasOnlyAllowedFields([
+          'commandId', 'ownerUid', 'targetDeviceId', 'commandType',
+          'createdAt', 'expiresAt', 'status', 'executionResult',
+          'executedAt', 'deliveredAt', 'updatedAt', 'payload', 'parameters'
+        ]) &&
+        hasRequiredFields([
+          'commandId', 'ownerUid', 'targetDeviceId', 'commandType',
+          'createdAt', 'expiresAt', 'status'
+        ]) &&
+        data.commandId is string && data.commandId.size() > 0 && data.commandId.size() <= 128 &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128 &&
+        data.targetDeviceId is string && data.targetDeviceId.size() > 0 && data.targetDeviceId.size() <= 128 &&
+        data.commandType is string && data.commandType in [
+          'LOCK', 'UNLOCK', 'LOCATE', 'ALARM', 'SIREN', 'STOP_ALARM',
+          'WIPE', 'TAKE_PHOTO', 'CHANGE_PIN', 'RECORD_AUDIO', 'TRIGGER_ALARM',
+          'LOCK_DEVICE', 'WIPE_DEVICE', 'FLASH_LIGHT', 'SCREEN_MESSAGE'
+        ] &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.expiresAt) &&
+        data.status is string && data.status in [
+          'PENDING', 'DELIVERED', 'EXECUTED', 'FAILED', 'EXPIRED',
+          'PENDING_DELIVERY', 'DELIVERY_FAILED'
+        ] &&
+        (!('executionResult' in data) || (data.executionResult is string && data.executionResult.size() <= 2000)) &&
+        (!('executedAt' in data) || isValidTimestamp(data.executedAt)) &&
+        (!('deliveredAt' in data) || isValidTimestamp(data.deliveredAt)) &&
+        (!('updatedAt' in data) || isValidTimestamp(data.updatedAt)) &&
+        (!('payload' in data) || (data.payload is map && data.payload.size() <= 10)) &&
+        (!('parameters' in data) || (data.parameters is map && data.parameters.size() <= 10));
+    }
+
+    // Domain validator for device_locations/{locationId}
+    function isValidLocation(data) {
+      return hasOnlyAllowedFields([
+          'locationId', 'deviceId', 'ownerUid', 'latitude', 'longitude',
+          'accuracy', 'timestamp', 'altitude', 'speed', 'bearing', 'provider'
+        ]) &&
+        hasRequiredFields(['deviceId', 'ownerUid', 'latitude', 'longitude', 'accuracy', 'timestamp']) &&
+        (!('locationId' in data) || (data.locationId is string && data.locationId.size() > 0 && data.locationId.size() <= 128)) &&
+        data.deviceId is string && data.deviceId.size() > 0 && data.deviceId.size() <= 128 &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128 &&
+        data.latitude is number && data.latitude >= -90.0 && data.latitude <= 90.0 &&
+        data.longitude is number && data.longitude >= -180.0 && data.longitude <= 180.0 &&
+        data.accuracy is number && data.accuracy >= 0.0 && data.accuracy <= 10000.0 &&
+        isValidTimestamp(data.timestamp) &&
+        (!('altitude' in data) || data.altitude is number) &&
+        (!('speed' in data) || (data.speed is number && data.speed >= 0.0)) &&
+        (!('bearing' in data) || (data.bearing is number && data.bearing >= 0.0 && data.bearing <= 360.0)) &&
+        (!('provider' in data) || (data.provider is string && data.provider.size() <= 50));
+    }
+
+    // Domain validator for security_events/{eventId}
+    function isValidSecurityEvent(data) {
+      return hasOnlyAllowedFields([
+          'eventId', 'deviceId', 'ownerUid', 'eventType', 'timestamp',
+          'details', 'severity', 'metadata'
+        ]) &&
+        hasRequiredFields(['deviceId', 'ownerUid', 'eventType', 'timestamp', 'details', 'severity']) &&
+        (!('eventId' in data) || (data.eventId is string && data.eventId.size() > 0 && data.eventId.size() <= 128)) &&
+        data.deviceId is string && data.deviceId.size() > 0 && data.deviceId.size() <= 128 &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128 &&
+        data.eventType is string && data.eventType.size() > 0 && data.eventType.size() <= 100 &&
+        isValidTimestamp(data.timestamp) &&
+        data.details is string && data.details.size() <= 2000 &&
+        data.severity is string && data.severity in ['INFO', 'LOW', 'MEDIUM', 'WARNING', 'HIGH', 'CRITICAL'] &&
+        (!('metadata' in data) || (data.metadata is map && data.metadata.size() <= 20));
+    }
+
+    // Domain validator for notifications/{notificationId}
+    function isValidNotification(data) {
+      return hasOnlyAllowedFields([
+          'notificationId', 'userId', 'title', 'message', 'timestamp',
+          'read', 'type', 'data'
+        ]) &&
+        hasRequiredFields(['userId', 'title', 'message', 'timestamp', 'read']) &&
+        (!('notificationId' in data) || (data.notificationId is string && data.notificationId.size() > 0 && data.notificationId.size() <= 128)) &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.message is string && data.message.size() > 0 && data.message.size() <= 2000 &&
+        isValidTimestamp(data.timestamp) &&
+        data.read is bool &&
+        (!('type' in data) || (data.type is string && data.type.size() <= 50)) &&
+        (!('data' in data) || (data.data is map && data.data.size() <= 20));
+    }
+
+    // Domain validator for trusted_devices/{trustedId}
+    function isValidTrustedDevice(data) {
+      return hasOnlyAllowedFields([
+          'trustedId', 'ownerUid', 'deviceId', 'name',
+          'phoneNumber', 'relationship', 'addedAt', 'isActive'
+        ]) &&
+        hasRequiredFields(['ownerUid', 'name', 'addedAt']) &&
+        (!('trustedId' in data) || (data.trustedId is string && data.trustedId.size() > 0 && data.trustedId.size() <= 128)) &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        isValidTimestamp(data.addedAt) &&
+        (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 128)) &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() >= 5 && data.phoneNumber.size() <= 30)) &&
+        (!('relationship' in data) || (data.relationship is string && data.relationship.size() <= 50)) &&
+        (!('isActive' in data) || data.isActive is bool);
+    }
+
+    // ===============================================================
+    // Collection Security Rules
+    // ===============================================================
+
+    // 1. users/{userId}
+    // Only the authenticated user matching userId can read or manage their profile.
+    // Protects PII (email, phone, fcmToken) from all unauthorized or blanket reads.
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       request.resource.data.userId == userId &&
+                       isValidUser(request.resource.data) &&
+                       (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+
+      allow update: if isOwner(userId) &&
+                       request.resource.data.userId == userId &&
+                       isValidUser(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['userId', 'createdAt']) &&
+                       (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || isAdmin());
+
+      allow delete: if isOwner(userId);
+    }
+
+    // 2. devices/{deviceId}
+    // Device documents storing configuration, status, and telemetry.
+    // Read and mutations strictly restricted to the verified device owner.
+    match /devices/{deviceId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       (!('deviceId' in request.resource.data) || request.resource.data.deviceId == deviceId) &&
+                       isValidDevice(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isValidDevice(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['ownerUid', 'registeredAt']);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 3. device_commands/{commandId}
+    // Commands dispatched to devices (e.g. LOCK, LOCATE, SIREN, WIPE).
+    // Only the owner of the target device can create commands.
+    // Commands cannot be expired upon creation.
+    // Status transitions strictly validated: PENDING -> DELIVERED -> EXECUTED / FAILED.
+    // Update permitted by owner or target device.
+    match /device_commands/{commandId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.commandId == commandId &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.status == 'PENDING' &&
+                       isFutureTimestamp(request.resource.data.expiresAt) &&
+                       isDeviceOwner(request.resource.data.targetDeviceId) &&
+                       isValidCommand(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.ownerUid ||
+                        request.auth.uid == resource.data.targetDeviceId ||
+                        isDeviceOwner(resource.data.targetDeviceId)) &&
+                       request.resource.data.ownerUid == resource.data.ownerUid &&
+                       validCommandStatusTransition(resource.data.status, request.resource.data.status) &&
+                       isValidCommand(request.resource.data) &&
+                       areImmutableFieldsUnchanged([
+                         'commandId', 'ownerUid', 'targetDeviceId',
+                         'commandType', 'createdAt', 'expiresAt'
+                       ]);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 4. device_locations/{locationId}
+    // Historical GPS fixes uploaded by the target device.
+    // Access and submission strictly restricted to the device owner.
+    match /device_locations/{locationId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isDeviceOwner(request.resource.data.deviceId) &&
+                       isValidLocation(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isValidLocation(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['ownerUid', 'deviceId']);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 5. security_events/{eventId}
+    // Security audit log events (e.g. SIM swap, wrong PIN, dispatch alerts).
+    // Append and read restricted to verified device owner.
+    match /security_events/{eventId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isDeviceOwner(request.resource.data.deviceId) &&
+                       isValidSecurityEvent(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isValidSecurityEvent(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['ownerUid', 'deviceId', 'eventType', 'timestamp']);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 6. notifications/{notificationId}
+    // User alerts and command execution notifications.
+    // Restricted strictly to the recipient user.
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidNotification(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidNotification(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['userId', 'timestamp']);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // 7. trusted_devices/{trustedId}
+    // Trusted secondary devices and emergency contact associations.
+    // Read and write restricted strictly to the device owner.
+    match /trusted_devices/{trustedId} {
+      allow read: if isAuthenticated() &&
+                     resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isValidTrustedDevice(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       isValidTrustedDevice(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['ownerUid', 'addedAt']);
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.ownerUid == request.auth.uid;
+    }
+
+  }
+}

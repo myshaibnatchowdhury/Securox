@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SECUROX — Admin Control Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-container">
+      <div class="brand-section">
+        <img src="securox_logo.jpg" alt="SECUROX Shield Logo" class="brand-logo">
+        <div>
+          <div class="brand-title">SECUROX <span>ADMIN</span></div>
+          <div class="brand-subtitle">Master Device Protection & Control Room</div>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <div class="cloud-status-badge">
+          <div class="pulsing-dot"></div>
+          <span id="systemStatusLabel">FIREBASE SECURE LINK: ACTIVE</span>
+        </div>
+        <a href="SECUROX-debug.apk" class="btn-apk-download" download>
+          <span>⬇</span> Download APK v1.0
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main>
+    <div class="dashboard-grid">
+      
+      <!-- LEFT COLUMN: DEVICE LIST -->
+      <section class="cyber-card">
+        <div class="card-header">
+          <h2><span>📱</span> Managed Devices (<span id="deviceCount">2</span>)</h2>
+          <button class="copy-btn" id="refreshDevicesBtn">Refresh</button>
+        </div>
+
+        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">
+          Select a registered phone to view live telemetry and send authenticated security commands.
+        </p>
+
+        <div class="device-list" id="deviceListContainer">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top: 20px;">
+          <h3 style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Quick Device Enroll</h3>
+          <button class="copy-btn" style="width: 100%; padding: 8px;" id="enrollDemoDeviceBtn">+ Enroll Additional Phone</button>
+        </div>
+      </section>
+
+      <!-- CENTER COLUMN: TELEMETRY & MASTER CONTROLS -->
+      <section>
+        
+        <!-- TELEMETRY HERO -->
+        <div class="cyber-card highlight" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <h2 id="activeDeviceTitle">TARGET: Samsung Galaxy S24 Ultra</h2>
+            <span class="badge-online" id="activeDeviceStatusBadge">● ONLINE</span>
+          </div>
+
+          <div class="telemetry-hero">
+            <div class="telemetry-stat">
+              <div class="lbl">Battery Level</div>
+              <div class="val" id="telemetryBattery">89% ⚡</div>
+            </div>
+            <div class="telemetry-stat">
+              <div class="lbl">Device Admin</div>
+              <div class="val" id="telemetryAdmin" style="color: var(--neon-primary);">ACTIVE</div>
+            </div>
+            <div class="telemetry-stat">
+              <div class="lbl">Device Owner</div>
+              <div class="val" id="telemetryOwner" style="color: var(--neon-secondary);">ENROLLED</div>
+            </div>
+          </div>
+
+          <!-- EMERGENCY LOCK BANNER -->
+          <div class="emergency-lock-banner">
+            <h3>🚨 EMERGENCY REMOTE LOCK</h3>
+            <p>Directly invokes Android <code>DevicePolicyManager.lockNow()</code> on the target phone to prevent unauthorized access.</p>
+            <button class="btn-emergency-lock" id="btnEmergencyLock">
+              <span>🔒</span> EXECUTE EMERGENCY LOCK NOW
+            </button>
+            <div id="lockStatusResult" style="font-size: 12px; margin-top: 10px; font-weight: 600; color: var(--neon-primary); display: none;"></div>
+          </div>
+
+          <!-- COMMAND CENTER GRID -->
+          <div class="card-header" style="margin-top: 10px;">
+            <h2><span>⚡</span> Master Security Commands</h2>
+          </div>
+
+          <div class="action-grid">
+            <div class="action-card" id="btnActionLocate">
+              <div class="action-icon">📍</div>
+              <div class="action-info">
+                <h4>Locate Device</h4>
+                <p>Request real-time GPS coordinate ping</p>
+              </div>
+            </div>
+
+            <div class="action-card" id="btnActionSiren">
+              <div class="action-icon" style="color: var(--warning); border-color: var(--warning);">🔊</div>
+              <div class="action-info">
+                <h4>Trigger Siren Alarm</h4>
+                <p>Sound loud acoustic anti-theft siren</p>
+              </div>
+            </div>
+
+            <div class="action-card" id="btnActionAntiShutdown">
+              <div class="action-icon" style="color: var(--neon-secondary); border-color: var(--neon-secondary);">🚫</div>
+              <div class="action-info">
+                <h4>Anti-Shutdown Lock</h4>
+                <p>Arm boot & power tripwire monitor</p>
+              </div>
+            </div>
+
+            <div class="action-card" id="btnActionFRP">
+              <div class="action-icon" style="color: var(--neon-primary); border-color: var(--neon-primary);">🛡️</div>
+              <div class="action-info">
+                <h4>Enforce FRP</h4>
+                <p>Block factory reset & safe boot</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- LIVE MAP -->
+          <div class="card-header" style="margin-top: 10px;">
+            <h2><span>🗺️</span> Real-Time GPS Tracking</h2>
+            <span style="font-size: 11px; color: var(--text-secondary);" id="gpsCoordinates">Lat: 23.8103, Lng: 90.4125 (±4m)</span>
+          </div>
+
+          <div id="map" class="map-container"></div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: AUDIT LOGS & PROVISIONING -->
+      <section class="cyber-card">
+        <div class="card-header">
+          <h2><span>📑</span> Live Security Audit</h2>
+          <span style="font-size: 11px; color: var(--neon-primary);">REAL-TIME</span>
+        </div>
+
+        <div class="timeline" id="auditTimeline">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--card-border);">
+          <div class="card-header" style="margin-bottom: 8px;">
+            <h2><span>⚙️</span> Enterprise ADB Setup</h2>
+          </div>
+          <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+            Grant Device Owner permissions via ADB for full hardware anti-theft protection:
+          </p>
+
+          <div class="enterprise-box">
+            <span id="adbCodeText">adb shell dpm set-device-owner com.securox.antitheft/.security.SecuroxDeviceAdminReceiver</span>
+            <button class="copy-btn" id="btnCopyAdb">Copy</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div style="max-width: 1300px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <strong>SECUROX</strong> &mdash; Advanced Anti-Theft & Device Security &bull; "Your Phone. Our Protection."
+      </div>
+      <div>
+        Built with Android Jetpack Compose + Clean Architecture + Firebase Cloud Backend
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

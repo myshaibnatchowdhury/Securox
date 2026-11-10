@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SECUROX</string>
+    <string name="app_full_name">SECUROX - Advanced Anti-Theft &amp; Device Security</string>
+    <string name="tagline_primary">Your Phone. Our Protection.</string>
+    <string name="tagline_secondary">Secure Today. Safe Tomorrow.</string>
+    <string name="hero_description">SECUROX keeps your Android device safe, secure and under your control — even if it\'s lost or stolen.</string>
+    
+    <!-- Device Administrator -->
+    <string name="device_admin_label">SECUROX Anti-Theft Guardian</string>
+    <string name="device_admin_description">Enables SECUROX to protect this device by supporting immediate remote screen locking and detecting unauthorized tampering.</string>
+
+    <!-- Location Service Notification -->
+    <string name="location_service_notification_title">SECUROX Active Protection</string>
+    <string name="location_service_notification_text">Anti-theft GPS tracking is actively securing your device.</string>
+    <string name="notification_channel_security">SECUROX Security Alerts</string>
+    <string name="notification_channel_security_desc">Critical anti-theft and remote command execution notifications</string>
+    <string name="notification_channel_location">SECUROX Location Guardian</string>
+    <string name="notification_channel_location_desc">Persistent location tracking notification</string>
+</resources>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "104928374615",
+    "project_id": "securox-anti-theft",
+    "storage_bucket": "securox-anti-theft.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:104928374615:android:7d8a9b0c1e2f3a4b5c6d7e",
+        "android_client_info": {
+          "package_name": "com.securox.antitheft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSySecuroxAntiTheftKeyDemonstration2026"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

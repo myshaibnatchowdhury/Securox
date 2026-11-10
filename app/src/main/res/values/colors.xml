@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="securox_bg">#030806</color>
+    <color name="securox_surface">#0A110D</color>
+    <color name="securox_card">#101A13</color>
+    <color name="securox_card_stroke">#1C3322</color>
+    <color name="securox_primary_neon">#39FF14</color>
+    <color name="securox_secondary_neon">#8DFF62</color>
+    <color name="securox_metallic_silver">#C8D1D9</color>
+    <color name="securox_white">#FFFFFF</color>
+    <color name="securox_warning">#FFB020</color>
+    <color name="securox_danger">#FF3434</color>
+    <color name="securox_muted">#7F9185</color>
+</resources>
