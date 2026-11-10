@@ -229,6 +229,16 @@ fun SecuroxNavGraph(
                     )
                 }
 
+                // Admin Control Dashboard Screen
+                composable(Screen.AdminControlDashboard.route) {
+                    AdminControlDashboardScreen(
+                        viewModel = viewModel,
+                        onNavigateToEmergencyLock = { navController.navigate(Screen.EmergencyLock.route) },
+                        onNavigateToLocationTracking = { navController.navigate(Screen.LocationTracking.route) },
+                        onBackClick = { navController.navigate(Screen.Home.route) }
+                    )
+                }
+
                 // 7. Register Device Screen
                 composable(Screen.RegisterDevice.route) {
                     RegisterDeviceScreen(

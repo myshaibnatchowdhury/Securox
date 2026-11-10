@@ -14,8 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,8 +28,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CheckCircle
@@ -40,11 +39,12 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockClock
+import androidx.compose.material.icons.filled.NotificationImportant
 import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.SimCardAlert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -80,7 +80,6 @@ import com.securox.antitheft.core.theme.SecuroxCardBorder
 import com.securox.antitheft.core.theme.SecuroxCardBorderHighlight
 import com.securox.antitheft.core.theme.SecuroxDanger
 import com.securox.antitheft.core.theme.SecuroxMetallicSilver
-import com.securox.antitheft.core.theme.SecuroxNeonMuted
 import com.securox.antitheft.core.theme.SecuroxNeonPrimary
 import com.securox.antitheft.core.theme.SecuroxNeonSecondary
 import com.securox.antitheft.core.theme.SecuroxSurface
@@ -96,7 +95,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminControlDashboardScreen(
     viewModel: SecuroxViewModel,
@@ -110,12 +108,25 @@ fun AdminControlDashboardScreen(
     val devices by viewModel.devices.collectAsState()
     val targetDevice by viewModel.selectedTargetDevice.collectAsState()
     val events by viewModel.events.collectAsState()
-    val commands by viewModel.commands.collectAsState()
     val lockStatus by viewModel.lockStatus.collectAsState()
 
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
     var actionFeedback by remember { mutableStateOf<String?>(null) }
     var isDispatchingAction by remember { mutableStateOf(false) }
+
+    // Fallback device if devices list is loaded but targetDevice is null
+    val effectiveDevice = targetDevice ?: devices.firstOrNull() ?: DeviceInfo(
+        deviceId = "local_phone",
+        deviceName = "My Android Phone",
+        manufacturer = "Android",
+        model = "Protected Device",
+        androidVersion = "14",
+        isOnline = true,
+        batteryLevel = 100,
+        isAdminActive = true,
+        isDeviceOwner = false,
+        protectionStatus = "PROTECTED"
+    )
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseGlow by infiniteTransition.animateFloat(
@@ -144,7 +155,7 @@ fun AdminControlDashboardScreen(
             ) {
                 IconButton(onClick = onBackClick) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = SecuroxNeonPrimary
                     )
@@ -187,7 +198,7 @@ fun AdminControlDashboardScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 if (devices.isEmpty()) {
                     Text(
-                        text = "No devices registered yet.",
+                        text = "Using Local Phone Profile (Add more devices anytime).",
                         color = SecuroxTextMuted,
                         fontSize = 13.sp
                     )
@@ -196,7 +207,7 @@ fun AdminControlDashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(devices) { dev ->
-                            val isSelected = (dev.deviceId == targetDevice?.deviceId)
+                            val isSelected = (dev.deviceId == effectiveDevice.deviceId)
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
@@ -239,188 +250,270 @@ fun AdminControlDashboardScreen(
         }
 
         // TARGET DEVICE TELEMETRY CARD
-        targetDevice?.let { dev ->
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = SecuroxCard),
-                    border = BorderStroke(1.dp, SecuroxCardBorderHighlight),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = dev.deviceName,
-                                    color = SecuroxWhite,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${dev.manufacturer} • ${dev.model} • Android ${dev.androidVersion}",
-                                    color = SecuroxTextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (dev.isOnline) SecuroxNeonPrimary.copy(alpha = 0.15f) else SecuroxDanger.copy(alpha = 0.15f))
-                                    .border(1.dp, if (dev.isOnline) SecuroxNeonPrimary else SecuroxDanger, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (dev.isOnline) "● ONLINE" else "○ OFFLINE",
-                                    color = if (dev.isOnline) SecuroxNeonPrimary else SecuroxDanger,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // TELEMETRY GRID
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            TelemetryPill(
-                                icon = if (dev.batteryLevel > 20) Icons.Default.BatteryChargingFull else Icons.Default.BatteryAlert,
-                                label = "Battery",
-                                value = "${dev.batteryLevel}%",
-                                highlight = dev.batteryLevel > 20
-                            )
-                            TelemetryPill(
-                                icon = Icons.Default.AdminPanelSettings,
-                                label = "Device Admin",
-                                value = if (dev.isAdminActive) "ACTIVE" else "DISABLED",
-                                highlight = dev.isAdminActive
-                            )
-                            TelemetryPill(
-                                icon = Icons.Default.Security,
-                                label = "Device Owner",
-                                value = if (dev.isDeviceOwner) "ENROLLED" else "UNMANAGED",
-                                highlight = dev.isDeviceOwner
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+        item {
+            val dev = effectiveDevice
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SecuroxCard),
+                border = BorderStroke(1.dp, SecuroxCardBorderHighlight),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = "Protection Status: ${dev.protectionStatus}",
-                                color = SecuroxNeonSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text = dev.deviceName,
+                                color = SecuroxWhite,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Last Seen: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(dev.lastSeen))}",
-                                color = SecuroxTextMuted,
+                                text = "${dev.manufacturer} • ${dev.model} • Android ${dev.androidVersion}",
+                                color = SecuroxTextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (dev.isOnline) SecuroxNeonPrimary.copy(alpha = 0.15f) else SecuroxDanger.copy(alpha = 0.15f))
+                            .border(1.dp, if (dev.isOnline) SecuroxNeonPrimary else SecuroxDanger, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (dev.isOnline) "● ONLINE" else "○ OFFLINE",
+                                color = if (dev.isOnline) SecuroxNeonPrimary else SecuroxDanger,
+                                fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             )
                         }
                     }
-                }
-            }
 
-            // PRIMARY EMERGENCY COMMAND: EMERGENCY LOCK
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = SecuroxDanger.copy(alpha = 0.08f)),
-                    border = BorderStroke(1.5.dp, SecuroxDanger.copy(alpha = pulseGlow)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Emergency Lock",
-                                tint = SecuroxDanger,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "REMOTE EMERGENCY LOCK",
-                                    color = SecuroxDanger,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Text(
-                                    text = "Instantly locks the target phone screen via Android DevicePolicyManager",
-                                    color = SecuroxTextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                    // TELEMETRY GRID
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TelemetryPill(
+                            icon = if (dev.batteryLevel > 20) Icons.Default.BatteryChargingFull else Icons.Default.BatteryAlert,
+                            label = "Battery",
+                            value = "${dev.batteryLevel}%",
+                            highlight = dev.batteryLevel > 20
+                        )
+                        TelemetryPill(
+                            icon = Icons.Default.AdminPanelSettings,
+                            label = "Device Admin",
+                            value = if (dev.isAdminActive) "ACTIVE" else "DISABLED",
+                            highlight = dev.isAdminActive
+                        )
+                        TelemetryPill(
+                            icon = Icons.Default.Security,
+                            label = "Device Owner",
+                            value = if (dev.isDeviceOwner) "ENROLLED" else "UNMANAGED",
+                            highlight = dev.isDeviceOwner
+                        )
+                    }
 
-                        Button(
-                            onClick = {
-                                if (dev.isCurrentDevice) {
-                                    viewModel.startEmergencyLockSequence()
-                                    viewModel.confirmAndSendEmergencyLock(dev)
-                                } else {
-                                    onNavigateToEmergencyLock()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = SecuroxDanger),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.LockClock, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "EXECUTE EMERGENCY LOCK NOW",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        if (lockStatus.phase != LockExecutionPhase.IDLE) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Status: ${lockStatus.phase.name} — ${lockStatus.message}",
-                                color = if (lockStatus.phase == LockExecutionPhase.EXECUTED) SecuroxNeonPrimary else SecuroxWarning,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Protection Status: ${dev.protectionStatus}",
+                            color = SecuroxNeonSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Last Seen: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(dev.lastSeen))}",
+                            color = SecuroxTextMuted,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
+        }
 
-            // ADMIN CONTROL COMMAND GRID
-            item {
-                Text(
-                    text = "REMOTE COMMAND CENTER",
-                    color = SecuroxTextSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
+        // PRIMARY EMERGENCY COMMAND: EMERGENCY LOCK
+        item {
+            val dev = effectiveDevice
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SecuroxDanger.copy(alpha = 0.08f)),
+                border = BorderStroke(1.5.dp, SecuroxDanger.copy(alpha = pulseGlow)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Emergency Lock",
+                            tint = SecuroxDanger,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "REMOTE EMERGENCY LOCK",
+                                color = SecuroxDanger,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "Instantly locks the target phone screen via Android DevicePolicyManager",
+                                color = SecuroxTextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = {
+                            if (dev.isCurrentDevice) {
+                                viewModel.startEmergencyLockSequence()
+                                viewModel.confirmAndSendEmergencyLock(dev)
+                            } else {
+                                onNavigateToEmergencyLock()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SecuroxDanger),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.LockClock, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "EXECUTE EMERGENCY LOCK NOW",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (lockStatus.phase != LockExecutionPhase.IDLE) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Status: ${lockStatus.phase.name} — ${lockStatus.message}",
+                            color = if (lockStatus.phase == LockExecutionPhase.EXECUTED) SecuroxNeonPrimary else SecuroxWarning,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
+        }
 
-            item {
-                FlowRow(
+        // SPECIAL STOLEN PHONE CONTROL SUITE (ফোন চুরি হলেও নিয়ন্ত্রণ নিশ্চিতকরণ)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F2417)),
+                border = BorderStroke(1.5.dp, SecuroxNeonPrimary),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SecuroxNeonPrimary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = SecuroxNeonPrimary)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "THEFT PERSISTENCE SHIELD",
+                                color = SecuroxNeonPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "ফোন চুরি হলেও সর্বদা আপনার সম্পূর্ণ নিয়ন্ত্রণে রাখার ব্যবস্থা",
+                                color = SecuroxNeonSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Feature 1: SIM Protection
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.SimCardAlert, contentDescription = null, tint = SecuroxWarning, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "সিম পরিবর্তন প্রতিরোধ: অপরিচিত সিম ঢোকালেই ফোন অটোমেটিক লক ও নতুন নম্বর সার্ভারে প্রেরণ।",
+                            color = SecuroxTextPrimary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Feature 2: Force Siren
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.NotificationImportant, contentDescription = null, tint = SecuroxDanger, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "সাইলেন্ট মোড বাইপাস: সাইলেন্ট বা DND থাকলেও সর্বোচ্চ ভলিউমে সাইরেন বাজানো যাবে।",
+                            color = SecuroxTextPrimary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Feature 3: Anti-Reset
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.PowerOff, contentDescription = null, tint = SecuroxNeonPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "হার্ডওয়্যার শাটডাউন ও ফ্যাক্টরি রিসেট ব্লক: সেটিংস থেকে রিসেট বা সেফ বুট বন্ধ রাখা।",
+                            color = SecuroxTextPrimary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // ADMIN CONTROL COMMAND GRID
+        item {
+            Text(
+                text = "REMOTE COMMAND CENTER",
+                color = SecuroxTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+        }
+
+        item {
+            val dev = effectiveDevice
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Row 1: Locate & Sound Alarm
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    maxItemsInEachRow = 2
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Command 1: Locate Device
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.GpsFixed,
@@ -433,33 +526,37 @@ fun AdminControlDashboardScreen(
                         }
                     )
 
-                    // Command 2: Trigger Siren / Alarm
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
-                        icon = Icons.Default.VolumeUp,
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
                         title = "Sound Alarm",
                         desc = "Trigger loud anti-theft acoustic siren",
                         accentColor = SecuroxWarning,
                         onClick = {
                             isDispatchingAction = true
-                            viewModel.sendAdminAction(dev, AppConstants.CMD_SOUND_ALARM) { success, msg ->
+                            viewModel.sendAdminAction(dev, AppConstants.CMD_SOUND_ALARM) { _, msg ->
                                 isDispatchingAction = false
                                 actionFeedback = msg
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
+                }
 
-                    // Command 3: Anti-Shutdown Lockdown
+                // Row 2: Anti-Shutdown & Enforce FRP
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.PowerOff,
                         title = "Anti-Shutdown",
-                        desc = "Arm boot & power disconnect tripwire",
+                        desc = "Arm boot & power tripwire monitor",
                         accentColor = SecuroxNeonSecondary,
                         onClick = {
                             isDispatchingAction = true
-                            viewModel.sendAdminAction(dev, AppConstants.CMD_ENTER_LOCKDOWN) { success, msg ->
+                            viewModel.sendAdminAction(dev, AppConstants.CMD_ENTER_LOCKDOWN) { _, msg ->
                                 isDispatchingAction = false
                                 actionFeedback = msg
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -467,7 +564,6 @@ fun AdminControlDashboardScreen(
                         }
                     )
 
-                    // Command 4: Enterprise Factory Reset Protection
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Shield,
@@ -476,14 +572,19 @@ fun AdminControlDashboardScreen(
                         accentColor = SecuroxNeonPrimary,
                         onClick = {
                             viewModel.toggleEnterpriseRestrictions(true)
-                            viewModel.sendAdminAction(dev, AppConstants.CMD_ENABLE_RESTRICTIONS) { success, msg ->
+                            viewModel.sendAdminAction(dev, AppConstants.CMD_ENABLE_RESTRICTIONS) { _, msg ->
                                 actionFeedback = msg
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
+                }
 
-                    // Command 5: Status Check / Ping
+                // Row 3: Ping Device & Remote Wipe
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Refresh,
@@ -491,14 +592,13 @@ fun AdminControlDashboardScreen(
                         desc = "Request battery & network telemetry",
                         accentColor = SecuroxMetallicSilver,
                         onClick = {
-                            viewModel.sendAdminAction(dev, AppConstants.CMD_REFRESH_DEVICE_STATUS) { success, msg ->
+                            viewModel.sendAdminAction(dev, AppConstants.CMD_REFRESH_DEVICE_STATUS) { _, msg ->
                                 actionFeedback = msg
                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
 
-                    // Command 6: Remote Wipe (Device Owner)
                     AdminActionCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.DeleteForever,
@@ -609,9 +709,10 @@ fun AdminControlDashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Stolen or lost your physical phone? You can access the full SECUROX Web Control Dashboard from any browser (PC, Mac, iPhone, or Linux) using your Firebase account credentials to track live GPS, sound alarms, and execute remote lock.",
+                        text = "ফোন হারিয়ে গেলে আপনার অন্য কোনো ডিভাইস না থাকলেও যেকোনো কম্পিউটার, ল্যাপটপ বা যেকোনো ব্রাউজার থেকে SECUROX Web Control Dashboard (web/index.html) খুলে আপনার ইমেইল ও পাসওয়ার্ড দিয়ে দূর থেকেই স্ক্রিন লক, লাইভ জিপিএস লোকেশন ও সাইরেন অ্যালার্ম বাজাতে পারবেন।",
                         color = SecuroxTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     )
                 }
             }
@@ -690,6 +791,7 @@ fun AdminControlDashboardScreen(
 
     // REMOTE WIPE CONFIRMATION DIALOG
     if (showWipeConfirmDialog) {
+        val dev = effectiveDevice
         AlertDialog(
             onDismissRequest = { showWipeConfirmDialog = false },
             title = {
@@ -701,7 +803,7 @@ fun AdminControlDashboardScreen(
             },
             text = {
                 Text(
-                    text = "WARNING: This command will factory reset and erase all user data on '${targetDevice?.deviceName}'. This action cannot be undone. Are you sure you wish to proceed?",
+                    text = "WARNING: This command will factory reset and erase all user data on '${dev.deviceName}'. This action cannot be undone. Are you sure you wish to proceed?",
                     color = SecuroxTextPrimary,
                     fontSize = 13.sp
                 )
@@ -710,11 +812,9 @@ fun AdminControlDashboardScreen(
                 Button(
                     onClick = {
                         showWipeConfirmDialog = false
-                        targetDevice?.let { dev ->
-                            viewModel.sendAdminAction(dev, AppConstants.CMD_WIPE_DATA) { success, msg ->
-                                actionFeedback = msg
-                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                            }
+                        viewModel.sendAdminAction(dev, AppConstants.CMD_WIPE_DATA) { _, msg ->
+                            actionFeedback = msg
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SecuroxDanger)
